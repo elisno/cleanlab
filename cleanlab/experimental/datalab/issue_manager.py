@@ -49,6 +49,9 @@ class IssueManager(ABC):
         once the manager has set the `issues` and `summary` dataframes as instance attributes.
     """
 
+    issue_name: str
+    """Returns a key that is used to store issue summary results about the assigned Lab."""
+
     def __init__(self, datalab: Datalab):
         self.datalab = datalab
         self.info: Dict[str, Any] = {}
@@ -60,11 +63,14 @@ class IssueManager(ABC):
         class_name = self.__class__.__name__
         return class_name
 
-    @property
-    @abstractmethod
-    def issue_name(self) -> str:
-        """Returns a key that is used to store issue summary results about the assigned Lab."""
-        raise NotImplementedError
+    @classmethod
+    def __init_subclass__(cls):
+        required_class_variables = [
+            "issue_name",
+        ]
+        for var in required_class_variables:
+            if not hasattr(cls, var):
+                raise NotImplementedError(f"Class {cls.__name__} must define class variable {var}")
 
     @property
     def issue_score_key(self) -> str:
@@ -73,15 +79,14 @@ class IssueManager(ABC):
         return f"{self.issue_name}_score"
 
     @abstractmethod
-    def find_issues(self, /, *args, **kwargs) -> None:
+    def find_issues(self, *args, **kwargs) -> None:
         """Finds occurrences of this particular issue in the dataset.
 
         Computes the `issues` and `summary` dataframes. Calls `collect_info` to compute the `info` dict.
         """
         raise NotImplementedError
 
-    @abstractmethod
-    def collect_info(self, /, *args, **kwargs) -> dict:
+    def collect_info(self, *args, **kwargs) -> dict:
         """Collects data for the info attribute of the Datalab.
 
         NOTE
@@ -107,51 +112,6 @@ class IssueManager(ABC):
                 "score": [score],
             },
         )
-
-    def report(self, k: int, verbosity: int = 0) -> str:
-        """Returns a report of the issues found by this IssueManager.
-
-        Parameters
-        ----------
-        k :
-            The number of examples to report.
-
-        verbosity :
-            The level of verbosity for the report. Higher values mean more information.
-
-        Returns
-        -------
-        report :
-            A string containing the report.
-        """
-        if verbosity not in self.verbosity_levels:
-            raise ValueError(
-                f"Verbosity level {verbosity} not supported. "
-                f"Supported levels: {self.verbosity_levels.keys()}"
-            )
-        if self.issues.empty:
-            print(f"No issues found")
-
-        topk_ids = self.issues.sort_values(by=self.issue_score_key, ascending=True).index[:k]
-
-        report = f"{self.issue_name:-^80}\n\n"
-        columns = {}
-        for level, verbosity_dict in self.verbosity_levels.items():
-            if level <= verbosity:
-                for key, values in verbosity_dict.items():
-                    if key == "issue":
-                        # Add the issue-specific info, with the top k ids
-                        new_columns = {
-                            col: np.array(self.info[col])[topk_ids]
-                            for col in values
-                            if self.info.get(col, None) is not None
-                        }
-                        columns.update(new_columns)
-                    elif key == "summary":
-                        for value in values:
-                            report += f"{value}:\n{self.info[value]}\n\n"
-        report += self.issues.loc[topk_ids].copy().assign(**columns).to_string()
-        return report
 
     @property
     def verbosity_levels(self) -> Dict[int, Dict[str, List[str]]]:
@@ -475,7 +435,7 @@ class NearDuplicateIssueManager(IssueManager):
     def __init__(
         self,
         datalab: Datalab,
-        metric: Optional[str] = 'cosine',
+        metric: Optional[str] = "cosine",
         threshold: Optional[float] = None,
         k: Optional[int] = 10,
         **_,
@@ -495,21 +455,20 @@ class NearDuplicateIssueManager(IssueManager):
         feature_array = self._extract_embeddings(features)
         if self.knn is None:
             self.knn = NearestNeighbors(n_neighbors=self.k, metric=self.metric)
-            
+
         try:
             check_is_fitted(self.knn)
         except:
-            self.knn.fit(feature_array) 
-        
+            self.knn.fit(feature_array)
+
         scores, distances = self._score_features(feature_array)
         self.radius, self.threshold = self._compute_threshold_and_radius()
-    
+
         dist, indices = self.knn.radius_neighbors(feature_array, self.radius)
         near_duplicate_sets = {}
         for idx, duplicates in enumerate(indices):
             duplicates = duplicates[duplicates != idx]
             near_duplicate_sets[idx] = duplicates
-
 
         self.issues = pd.DataFrame(
             {
@@ -537,7 +496,6 @@ class NearDuplicateIssueManager(IssueManager):
             "k": self.k,
             "threshold": self.threshold,
         }
-
 
         knn = self.knn
         dists, nn_ids = [array[:, 0] for array in knn.kneighbors()]  # type: ignore[union-attr]
@@ -572,18 +530,20 @@ class NearDuplicateIssueManager(IssueManager):
     def _score_features(self, feature_array) -> Tuple[np.ndarray, np.ndarray]:
         """Computes nearest-neighbor distances and near-duplicate scores for input features"""
         distances, neighbor_indices = self.knn.kneighbors(feature_array)
-        distances = distances[:,1] # nearest neighbor is always itself
+        distances = distances[:, 1]  # nearest neighbor is always itself
 
         self.distances = distances
-        
+
         scores = np.tanh(distances)
         return scores, distances
 
     def _compute_threshold_and_radius(self) -> float:
         """Computes the radius for nearest-neighbors thresholding"""
         if self.threshold is None:
-            no_exact_duplicates = self.distances[self.distances != 0]    
-            median_nonzero_distance = np.median(no_exact_duplicates) # get median nonzero nearest-neighbor distance
+            no_exact_duplicates = self.distances[self.distances != 0]
+            median_nonzero_distance = np.median(
+                no_exact_duplicates
+            )  # get median nonzero nearest-neighbor distance
             radius = median_nonzero_distance * 0.1
             threshold = np.tanh(radius)
         else:
@@ -594,13 +554,9 @@ class NearDuplicateIssueManager(IssueManager):
     @property
     def verbosity_levels(self) -> Dict[int, Any]:
         return {
-            0: {"issue": ["near_duplicate_sets"]}, # This is important information, but the output could be very large. Maybe it shouldn't be default
+            0: {
+                "issue": ["near_duplicate_sets"]
+            },  # This is important information, but the output could be very large. Maybe it shouldn't be default
             1: {"summary": ["num_near_duplicate_issues"]},
             2: {"issue": ["nearest_neighbor", "distance_to_nearest_neighbour"]},
         }
-
-
-
-        
-            
-            
