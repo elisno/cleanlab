@@ -167,6 +167,7 @@ class Datalab:
         required_args_per_issue_type = {
             "label": {"pred_probs": pred_probs, "model": model},
             "ood": {"pred_probs": pred_probs, "features": features},
+            "near_duplicate": {"features": features},
         }
 
         issue_types_copy = self._set_issue_types(issue_types, required_args_per_issue_type)

@@ -6,6 +6,7 @@ from cleanlab.experimental.datalab.issue_manager import (
     IssueManager,
     LabelIssueManager,
     OutOfDistributionIssueManager,
+    NearDuplicateIssueManager,
 )
 
 
@@ -16,6 +17,7 @@ class _IssueManagerFactory:
     types = {
         "ood": OutOfDistributionIssueManager,
         "label": LabelIssueManager,
+        "near_duplicate": NearDuplicateIssueManager,
     }
 
     @classmethod
