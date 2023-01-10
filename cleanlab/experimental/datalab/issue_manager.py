@@ -508,8 +508,8 @@ class NearDuplicateIssueManager(IssueManager):
         near_duplicate_sets = {}
         for idx, duplicates in enumerate(indices):
             duplicates = duplicates[duplicates != idx]
-            if len(duplicates) > 0:
-                near_duplicate_sets[idx] = duplicates
+            near_duplicate_sets[idx] = duplicates
+
 
         self.issues = pd.DataFrame(
             {
@@ -527,7 +527,7 @@ class NearDuplicateIssueManager(IssueManager):
     def collect_info(self) -> dict:
         issues_dict = {
             "num_near_duplicate_issues": len(self.near_duplicate_sets),
-            "average_near_duplicate_score": self.issues[self.issue_name].mean(),
+            "average_near_duplicate_score": self.issues[self.issue_score_key].mean(),
             "near_duplicate_sets": self.near_duplicate_sets,
             "radius": self.radius,
         }
