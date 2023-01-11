@@ -445,6 +445,7 @@ class NearDuplicateIssueManager(IssueManager):
         self.threshold = threshold
         self.k = k
         self.knn = None
+        self.near_duplicate_sets: List[List[int]] = []
 
     def find_issues(
         self,
@@ -464,12 +465,6 @@ class NearDuplicateIssueManager(IssueManager):
         scores, distances = self._score_features(feature_array)
         self.radius, self.threshold = self._compute_threshold_and_radius()
 
-        dist, indices = self.knn.radius_neighbors(feature_array, self.radius)
-        near_duplicate_sets = {}
-        for idx, duplicates in enumerate(indices):
-            duplicates = duplicates[duplicates != idx]
-            near_duplicate_sets[idx] = duplicates
-
         self.issues = pd.DataFrame(
             {
                 f"is_{self.issue_name}_issue": scores < self.threshold,
@@ -477,7 +472,10 @@ class NearDuplicateIssueManager(IssueManager):
             },
         )
 
-        self.near_duplicate_sets = near_duplicate_sets
+        indices = self.knn.radius_neighbors(feature_array, self.radius, return_distance=False)
+        self.near_duplicate_sets = [
+            duplicates[duplicates != idx] for idx, duplicates in enumerate(indices)
+        ]
         self.distances = distances
 
         self.summary = self.get_summary(score=scores.mean())
