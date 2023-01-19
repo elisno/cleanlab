@@ -165,6 +165,7 @@ class Datalab:
         """
 
         required_args_per_issue_type = self._resolve_required_args(pred_probs, features, model)
+
         issue_types_copy = self._set_issue_types(issue_types, required_args_per_issue_type)
 
         new_issue_managers = [
