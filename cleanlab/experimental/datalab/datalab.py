@@ -205,7 +205,7 @@ class Datalab:
         """
         args_dict = {
             "label": {"pred_probs": pred_probs, "model": model},
-            "ood": {"pred_probs": pred_probs, "features": features},
+            "outlier": {"pred_probs": pred_probs, "features": features},
             "near_duplicate": {"features": features},
         }
 
