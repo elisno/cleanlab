@@ -22,12 +22,13 @@ and managing all kinds of issues in datasets.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 import warnings
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
+from cleanvision.imagelab import Imagelab
 
 import cleanlab
 from cleanlab.datalab.data import Data
@@ -95,6 +96,14 @@ class Datalab:
         self.cleanlab_version = cleanlab.version.__version__
         self.path = ""
         self.verbosity = verbosity
+        self.imagelab = None
+        if image_key:
+            if isinstance(self.data, Dataset):
+                self.imagelab = Imagelab(hf_dataset=self.data, image_key=image_key)
+            else:
+                raise ValueError(
+                    "Other data formats not supported for cleanvision checks as of now"
+                )
 
     def __repr__(self) -> str:
         """What is displayed if user executes: datalab"""
@@ -222,6 +231,16 @@ class Datalab:
         # TODO: Check for any missing arguments that are required for each issue type.
         args_dict = {k: v for k, v in args_dict.items() if v}
 
+        # Adds default issue types to be checked by imagelab from datalab, did not add near/exact duplicates
+        if self.imagelab:
+            args_dict["image_issue_types"] = {
+                "dark": {},
+                "light": {},
+                "low_information": {},
+                "odd_aspect_ratio": {},
+                "grayscale": {},
+                "blurry": {},
+            }
         return args_dict
 
     def _set_issue_types(
@@ -297,6 +316,11 @@ class Datalab:
         #   E.g. for label issues, only show the confident joint computed with the health_summary
         report_str = ""
         issue_type_sorted = self._sort_issue_summary_by_issue_counts(self.issue_summary)
+        imagelab_issues = self.imagelab.issue_summary["issue_type"]
+        issue_type_sorted = issue_type_sorted[
+            ~issue_type_sorted["issue_type"].isin(imagelab_issues)
+        ]
+
         report_str += self._add_issue_summary_to_report(summary=issue_type_sorted)
         issue_type_sorted_keys: List[str] = issue_type_sorted["issue_type"].tolist()
         issue_manager_reports = []
@@ -464,7 +488,7 @@ class Datalab:
         ----------
         pred_probs :
             Out-of-sample predicted class probabilities made by the model for every example in the dataset.
-            To best detect label issues, provide this input obtained from the most accurate model you can produce.
+            To best detect label issues, provide this input obtained from the most accurate model you can produce.
 
         features :
             Feature embeddings (vector representations) of every example in the dataset.
@@ -559,6 +583,14 @@ class Datalab:
                 print(f"Error in {issue_manager.issue_name}: {e}")
                 failed_managers.append(issue_manager)
 
+        try:
+            self.imagelab.find_issues(issue_types=issue_types_copy["image_issue_types"])
+            self.data_issues.collect_statistics_from_issue_manager(self.imagelab)
+            self.data_issues._collect_results_from_imagelab(self.imagelab)
+        except Exception as e:
+            print(f"Error in checking for image issues: {e}")
+            failed_managers.append(self.imagelab)
+
         if self.verbosity:
             print(
                 f"Audit complete. {self.issue_summary['num_issues'].sum()} issues found in the dataset."
@@ -584,11 +616,15 @@ class Datalab:
 
         issue_types_copy = self._set_issue_types(issue_types, required_args_per_issue_type)
 
+        default_issues = list_default_issue_types()
+        if self.imagelab:
+            default_issues.extend(issue_types_copy["image_issue_types"].keys())
+
         if issue_types is None:
             # Only run default issue types if no issue types are specified
             issue_types_copy = {
                 issue: issue_types_copy[issue]
-                for issue in list_default_issue_types()
+                for issue in default_issues
                 if issue in issue_types_copy
             }
 
@@ -636,6 +672,7 @@ class Datalab:
                 include_description=include_description,
             )
         )
+        self.imagelab.report(num_images=num_examples, verbosity=verbosity)
 
     def save(self, path: str, force: bool = False) -> None:
         """Saves this Datalab object to file (all files are in folder at `path/`).

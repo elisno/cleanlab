@@ -22,16 +22,17 @@ It collects information from various
 instances and keeps track of each issue, a summary for each type of issue,
 related information and statistics about the issues.
 
-The collected information can be accessed using the 
+The collected information can be accessed using the
 :py:meth:`get_info <cleanlab.datalab.data_issues.DataIssues.get_info>` method.
 """
 from __future__ import annotations
 
 import warnings
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 import numpy as np
 
 import pandas as pd
+from cleanvision.imagelab import Imagelab
 
 if TYPE_CHECKING:  # pragma: no cover
     from cleanlab.datalab.data import Data
@@ -114,7 +115,9 @@ class DataIssues:
             info["class_names"] = self.statistics["class_names"]
         return info
 
-    def collect_statistics_from_issue_manager(self, issue_manager: IssueManager) -> None:
+    def collect_statistics_from_issue_manager(
+        self, issue_manager: Union[IssueManager, Imagelab]
+    ) -> None:
         """Update the statistics in the info dictionary.
 
         Parameters
@@ -138,6 +141,10 @@ class DataIssues:
         statistics: Dict[str, Any] = issue_manager.info.pop(key, {})
         if statistics:
             self.info[key].update(statistics)
+
+    def _collect_results_from_imagelab(self, imagelab: Imagelab) -> None:
+        # todo: update issue_summary and info from corresponding imagelab attributes
+        pass
 
     def _collect_results_from_issue_manager(self, issue_manager: IssueManager) -> None:
         """
