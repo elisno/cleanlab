@@ -29,8 +29,8 @@ from __future__ import annotations
 
 import warnings
 from typing import TYPE_CHECKING, Any, Dict, Optional, Union
-import numpy as np
 
+import numpy as np
 import pandas as pd
 from cleanvision.imagelab import Imagelab
 
@@ -142,9 +142,39 @@ class DataIssues:
         if statistics:
             self.info[key].update(statistics)
 
+    def _update_issues(self, new_issues_df):
+        overlapping_columns = list(set(self.issues.columns) & set(new_issues_df.columns))
+        if overlapping_columns:
+            warnings.warn(f"Overwriting columns {overlapping_columns} in self.issues")
+            self.issues.drop(columns=overlapping_columns, inplace=True)
+        self.issues = self.issues.join(new_issues_df, how="outer")
+
+    def _update_issue_info(self, issue_name, new_info):
+        if issue_name in self.info:
+            warnings.warn(f"Overwriting key {issue_name} in self.info")
+        self.info[issue_name] = new_info
+
     def _collect_results_from_imagelab(self, imagelab: Imagelab) -> None:
-        # todo: update issue_summary and info from corresponding imagelab attributes
-        pass
+        """
+        Collect results from Imagelab and update datalab.issues and datalab.issue_summary
+
+        Parameters
+        ----------
+        imagelab:
+            Imagelab instance that run all the checks for image issue types
+        """
+        self._update_issues(imagelab.issues)
+
+        common_rows = list(
+            set(imagelab.issue_summary["issue_type"]) & set(self.issue_summary["issue_type"])
+        )
+        if common_rows:
+            warnings.warn(f"Overwriting {common_rows} rows in self.issue_summary ")
+        self.issue_summary = self.issue_summary[~self.issue_summary["issue_type"].isin(common_rows)]
+        self.issue_summary = pd.concat(
+            [self.issue_summary, imagelab.issue_summary], axis=0, ignore_index=True
+        )
+        self._update_issue_info("image_issue_types", imagelab.info)
 
     def _collect_results_from_issue_manager(self, issue_manager: IssueManager) -> None:
         """
@@ -161,14 +191,7 @@ class DataIssues:
         issue_manager :
             IssueManager object to collect results from.
         """
-        overlapping_columns = list(set(self.issues.columns) & set(issue_manager.issues.columns))
-        if overlapping_columns:
-            warnings.warn(
-                f"Overwriting columns {overlapping_columns} in self.issues with "
-                f"columns from issue manager {issue_manager}."
-            )
-            self.issues.drop(columns=overlapping_columns, inplace=True)
-        self.issues = self.issues.join(issue_manager.issues, how="outer")
+        self._update_issues(issue_manager.issues)
 
         if issue_manager.issue_name in self.issue_summary["issue_type"].values:
             warnings.warn(
@@ -188,13 +211,7 @@ class DataIssues:
             axis=0,
             ignore_index=True,
         )
-
-        if issue_manager.issue_name in self.info:
-            warnings.warn(
-                f"Overwriting key {issue_manager.issue_name} in self.info with "
-                f"key from issue manager {issue_manager}."
-            )
-        self.info[issue_manager.issue_name] = issue_manager.info
+        self._update_issue_info(issue_manager.issue_name, issue_manager.info)
 
     def set_health_score(self) -> None:
         """Set the health score for the dataset based on the issue summary.

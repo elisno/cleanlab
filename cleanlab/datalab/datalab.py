@@ -29,6 +29,7 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd
 from cleanvision.imagelab import Imagelab
+from datasets.arrow_dataset import Dataset
 
 import cleanlab
 from cleanlab.datalab.data import Data
@@ -38,7 +39,6 @@ from cleanlab.datalab.factory import _IssueManagerFactory, list_default_issue_ty
 from cleanlab.datalab.serialize import _Serializer
 
 if TYPE_CHECKING:  # pragma: no cover
-    from datasets.arrow_dataset import Dataset
     from scipy.sparse import csr_matrix
 
     DatasetLike = Union[Dataset, pd.DataFrame, Dict[str, Any], List[Dict[str, Any]], str]
@@ -85,6 +85,7 @@ class Datalab:
         self,
         data: "DatasetLike",
         label_name: str,
+        image_key: str,
         verbosity: int = 1,
     ) -> None:
         self._data = Data(data, label_name)  # TODO: Set extracted class instance to self.data
@@ -230,17 +231,6 @@ class Datalab:
 
         # TODO: Check for any missing arguments that are required for each issue type.
         args_dict = {k: v for k, v in args_dict.items() if v}
-
-        # Adds default issue types to be checked by imagelab from datalab, did not add near/exact duplicates
-        if self.imagelab:
-            args_dict["image_issue_types"] = {
-                "dark": {},
-                "light": {},
-                "low_information": {},
-                "odd_aspect_ratio": {},
-                "grayscale": {},
-                "blurry": {},
-            }
         return args_dict
 
     def _set_issue_types(
@@ -274,6 +264,10 @@ class Datalab:
             self._check_missing_args(required_defaults_dict, issue_types_copy)
         else:
             issue_types_copy = required_defaults_dict.copy()
+            if self.imagelab:
+                print("Running default issue checks on raw images")
+                issue_types_copy["image_issue_types"] = {"dark": {}, "light": {}}
+
         # Check that all required arguments are provided.
         self._validate_issue_types_dict(issue_types_copy, required_defaults_dict)
 
@@ -495,7 +489,7 @@ class Datalab:
 
         knn_graph :
             Sparse matrix representing similarities between examples in the dataset in a K nearest neighbor graph.
-            If both `knn_graph` and `features` are provided, the `knn_graph` will take precendence.
+            If both `knn_graph` and `features` are provided, the `knn_graph` will take precedence.
             If `knn_graph` is not provided, it is constructed based on the provided `features`.
             If neither `knn_graph` nor `features` are provided, certain issue types like (near) duplicates will not be considered.
 
@@ -551,6 +545,7 @@ class Datalab:
             )
             return None
 
+        # fix this method, if no pred_probs, etc are given it should just run imagelab checks if an image dataset
         issue_types_copy = self.get_available_issue_types(
             pred_probs=pred_probs,
             features=features,
@@ -559,12 +554,16 @@ class Datalab:
             issue_types=issue_types,
         )
 
-        new_issue_managers = [
-            factory(datalab=self, **issue_types_copy.get(factory.issue_name, {}))
-            for factory in _IssueManagerFactory.from_list(list(issue_types_copy.keys()))
-        ]
+        new_issue_managers = []
+        for issue_type in issue_types_copy.keys():
+            if issue_type == "image_issue_types":
+                continue
+            factory = _IssueManagerFactory.from_str(issue_type)
+            new_issue_managers.append(
+                factory(datalab=self, **issue_types_copy.get(factory.issue_name, {}))
+            )
 
-        if not new_issue_managers:
+        if not new_issue_managers and not self.imagelab:
             no_args_passed = all(arg is None for arg in [pred_probs, features, knn_graph, model])
             if no_args_passed:
                 warnings.warn("No arguments were passed to find_issues.")
@@ -618,7 +617,7 @@ class Datalab:
 
         default_issues = list_default_issue_types()
         if self.imagelab:
-            default_issues.extend(issue_types_copy["image_issue_types"].keys())
+            default_issues.append("image_issue_types")
 
         if issue_types is None:
             # Only run default issue types if no issue types are specified
