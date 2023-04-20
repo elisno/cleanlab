@@ -30,7 +30,6 @@ if TYPE_CHECKING:  # pragma: no cover
 
     from cleanlab.datalab.datalab import Datalab
 
-
 # Constants:
 OBJECT_FILENAME = "datalab.pkl"
 ISSUES_FILENAME = "issues.csv"

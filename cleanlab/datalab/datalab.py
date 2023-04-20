@@ -22,12 +22,14 @@ and managing all kinds of issues in datasets.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 import warnings
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
+from cleanvision.imagelab import Imagelab
+from datasets.arrow_dataset import Dataset
 
 import cleanlab
 from cleanlab.datalab.data import Data
@@ -37,7 +39,6 @@ from cleanlab.datalab.factory import _IssueManagerFactory, list_default_issue_ty
 from cleanlab.datalab.serialize import _Serializer
 
 if TYPE_CHECKING:  # pragma: no cover
-    from datasets.arrow_dataset import Dataset
     from scipy.sparse import csr_matrix
 
     DatasetLike = Union[Dataset, pd.DataFrame, Dict[str, Any], List[Dict[str, Any]], str]
@@ -84,6 +85,7 @@ class Datalab:
         self,
         data: "DatasetLike",
         label_name: str,
+        image_key: str,
         verbosity: int = 1,
     ) -> None:
         self._data = Data(data, label_name)  # TODO: Set extracted class instance to self.data
@@ -95,6 +97,14 @@ class Datalab:
         self.cleanlab_version = cleanlab.version.__version__
         self.path = ""
         self.verbosity = verbosity
+        self.imagelab = None
+        if image_key:
+            if isinstance(self.data, Dataset):
+                self.imagelab = Imagelab(hf_dataset=self.data, image_key=image_key)
+            else:
+                raise ValueError(
+                    "Other data formats not supported for cleanvision checks as of now"
+                )
 
     def __repr__(self) -> str:
         """What is displayed if user executes: datalab"""
@@ -221,7 +231,6 @@ class Datalab:
 
         # TODO: Check for any missing arguments that are required for each issue type.
         args_dict = {k: v for k, v in args_dict.items() if v}
-
         return args_dict
 
     def _set_issue_types(
@@ -254,7 +263,25 @@ class Datalab:
             issue_types_copy = issue_types.copy()
             self._check_missing_args(required_defaults_dict, issue_types_copy)
         else:
+
             issue_types_copy = required_defaults_dict.copy()
+
+            # keep only default issue types
+            default_issues = list_default_issue_types()
+            issue_types_copy = {
+                issue: issue_types_copy[issue]
+                for issue in default_issues
+                if issue in issue_types_copy
+            }
+            if self.imagelab:
+                print("Running default issue checks on raw images")
+                # todo implement default issue types on imagelab side
+                issue_types_copy["image_issue_types"] = {
+                    "dark": {},
+                    "light": {},
+                    "near_duplicates": {},
+                }
+
         # Check that all required arguments are provided.
         self._validate_issue_types_dict(issue_types_copy, required_defaults_dict)
 
@@ -297,6 +324,11 @@ class Datalab:
         #   E.g. for label issues, only show the confident joint computed with the health_summary
         report_str = ""
         issue_type_sorted = self._sort_issue_summary_by_issue_counts(self.issue_summary)
+        imagelab_issues = self.imagelab.issue_summary["issue_type"]
+        issue_type_sorted = issue_type_sorted[
+            ~issue_type_sorted["issue_type"].isin(imagelab_issues)
+        ]
+
         report_str += self._add_issue_summary_to_report(summary=issue_type_sorted)
         issue_type_sorted_keys: List[str] = issue_type_sorted["issue_type"].tolist()
         issue_manager_reports = []
@@ -432,9 +464,10 @@ class Datalab:
         return self.issue_summary[row_mask].reset_index(drop=True)
 
     def _add_issue_summary_to_report(self, summary: pd.DataFrame) -> str:
+        summary_str = summary.to_string(index=False) if not summary.empty else ""
         return (
             "Here is a summary of the different kinds of issues found in the data:\n\n"
-            + summary.to_string(index=False)
+            + summary_str
             + "\n\n"
             + "(Note: A lower score indicates a more severe issue across all examples in the dataset.)\n\n\n"
         )
@@ -464,14 +497,14 @@ class Datalab:
         ----------
         pred_probs :
             Out-of-sample predicted class probabilities made by the model for every example in the dataset.
-            To best detect label issues, provide this input obtained from the most accurate model you can produce.
+            To best detect label issues, provide this input obtained from the most accurate model you can produce.
 
         features :
             Feature embeddings (vector representations) of every example in the dataset.
 
         knn_graph :
             Sparse matrix representing similarities between examples in the dataset in a K nearest neighbor graph.
-            If both `knn_graph` and `features` are provided, the `knn_graph` will take precendence.
+            If both `knn_graph` and `features` are provided, the `knn_graph` will take precedence.
             If `knn_graph` is not provided, it is constructed based on the provided `features`.
             If neither `knn_graph` nor `features` are provided, certain issue types like (near) duplicates will not be considered.
 
@@ -527,6 +560,7 @@ class Datalab:
             )
             return None
 
+        # fix this method, if no pred_probs, etc are given it should just run imagelab checks if an image dataset
         issue_types_copy = self.get_available_issue_types(
             pred_probs=pred_probs,
             features=features,
@@ -535,12 +569,16 @@ class Datalab:
             issue_types=issue_types,
         )
 
-        new_issue_managers = [
-            factory(datalab=self, **issue_types_copy.get(factory.issue_name, {}))
-            for factory in _IssueManagerFactory.from_list(list(issue_types_copy.keys()))
-        ]
+        new_issue_managers = []
+        for issue_type in issue_types_copy.keys():
+            if issue_type == "image_issue_types":
+                continue
+            factory = _IssueManagerFactory.from_str(issue_type)
+            new_issue_managers.append(
+                factory(datalab=self, **issue_types_copy.get(factory.issue_name, {}))
+            )
 
-        if not new_issue_managers:
+        if not new_issue_managers and not self.imagelab:
             no_args_passed = all(arg is None for arg in [pred_probs, features, knn_graph, model])
             if no_args_passed:
                 warnings.warn("No arguments were passed to find_issues.")
@@ -558,6 +596,14 @@ class Datalab:
             except Exception as e:
                 print(f"Error in {issue_manager.issue_name}: {e}")
                 failed_managers.append(issue_manager)
+
+        try:
+            self.imagelab.find_issues(issue_types=issue_types_copy["image_issue_types"])
+            self.data_issues.collect_statistics_from_issue_manager(self.imagelab)
+            self.data_issues._collect_results_from_imagelab(self.imagelab)
+        except Exception as e:
+            print(f"Error in checking for image issues: {e}")
+            failed_managers.append(self.imagelab)
 
         if self.verbosity:
             print(
@@ -584,15 +630,6 @@ class Datalab:
         )
 
         issue_types_copy = self._set_issue_types(issue_types, required_args_per_issue_type)
-
-        if issue_types is None:
-            # Only run default issue types if no issue types are specified
-            issue_types_copy = {
-                issue: issue_types_copy[issue]
-                for issue in list_default_issue_types()
-                if issue in issue_types_copy
-            }
-
         return issue_types_copy
 
     def get_info(self, issue_name: Optional[str] = None) -> Dict[str, Any]:
@@ -637,6 +674,7 @@ class Datalab:
                 include_description=include_description,
             )
         )
+        self.imagelab.report(num_images=num_examples, verbosity=verbosity)
 
     def save(self, path: str, force: bool = False) -> None:
         """Saves this Datalab object to file (all files are in folder at `path/`).
