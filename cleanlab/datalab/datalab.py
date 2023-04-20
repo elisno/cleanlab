@@ -263,10 +263,24 @@ class Datalab:
             issue_types_copy = issue_types.copy()
             self._check_missing_args(required_defaults_dict, issue_types_copy)
         else:
+
             issue_types_copy = required_defaults_dict.copy()
+
+            # keep only default issue types
+            default_issues = list_default_issue_types()
+            issue_types_copy = {
+                issue: issue_types_copy[issue]
+                for issue in default_issues
+                if issue in issue_types_copy
+            }
             if self.imagelab:
                 print("Running default issue checks on raw images")
-                issue_types_copy["image_issue_types"] = {"dark": {}, "light": {}}
+                # todo implement default issue types on imagelab side
+                issue_types_copy["image_issue_types"] = {
+                    "dark": {},
+                    "light": {},
+                    "near_duplicates": {},
+                }
 
         # Check that all required arguments are provided.
         self._validate_issue_types_dict(issue_types_copy, required_defaults_dict)
@@ -450,9 +464,10 @@ class Datalab:
         return self.issue_summary[row_mask].reset_index(drop=True)
 
     def _add_issue_summary_to_report(self, summary: pd.DataFrame) -> str:
+        summary_str = summary.to_string(index=False) if not summary.empty else ""
         return (
             "Here is a summary of the different kinds of issues found in the data:\n\n"
-            + summary.to_string(index=False)
+            + summary_str
             + "\n\n"
             + "(Note: A lower score indicates a more severe issue across all examples in the dataset.)\n\n\n"
         )
@@ -614,19 +629,6 @@ class Datalab:
         )
 
         issue_types_copy = self._set_issue_types(issue_types, required_args_per_issue_type)
-
-        default_issues = list_default_issue_types()
-        if self.imagelab:
-            default_issues.append("image_issue_types")
-
-        if issue_types is None:
-            # Only run default issue types if no issue types are specified
-            issue_types_copy = {
-                issue: issue_types_copy[issue]
-                for issue in default_issues
-                if issue in issue_types_copy
-            }
-
         return issue_types_copy
 
     def get_info(self, issue_name: Optional[str] = None) -> Dict[str, Any]:

@@ -171,10 +171,15 @@ class DataIssues:
         if common_rows:
             warnings.warn(f"Overwriting {common_rows} rows in self.issue_summary ")
         self.issue_summary = self.issue_summary[~self.issue_summary["issue_type"].isin(common_rows)]
+        imagelab_summary_copy = imagelab.issue_summary.copy()
+        imagelab_summary_copy.rename({"num_images": "num_issues"}, axis=1, inplace=True)
         self.issue_summary = pd.concat(
-            [self.issue_summary, imagelab.issue_summary], axis=0, ignore_index=True
+            [self.issue_summary, imagelab_summary_copy], axis=0, ignore_index=True
         )
-        self._update_issue_info("image_issue_types", imagelab.info)
+        for issue_type in imagelab.info.keys():
+            if issue_type == "statistics":
+                continue
+            self._update_issue_info(issue_type, imagelab.info[issue_type])
 
     def _collect_results_from_issue_manager(self, issue_manager: IssueManager) -> None:
         """
