@@ -1,8 +1,9 @@
+from typing import Optional
 import math
 
 import numpy as np
 import pytest
-from hypothesis import given, settings, strategies as st
+from hypothesis import assume, given, settings, strategies as st
 from hypothesis.strategies import composite
 from hypothesis.extra.numpy import arrays
 from scipy.sparse import csr_matrix
