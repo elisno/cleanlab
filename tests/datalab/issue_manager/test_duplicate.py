@@ -68,6 +68,37 @@ def knn_graph_strategy(draw, num_samples, k_neighbors):
 
     return csr_matrix((data, inds, indptr), shape=(num_samples, num_samples))
 
+
+def build_issue_manager(draw, num_samples_strategy, k_neighbors_strategy, with_issues: bool = False, threshold: Optional[float] = None):
+    """This is a helper function to build a NearDuplicateIssueManager that finds near-duplicate issues for a given knn_graph.
+    
+    As it's used for property-based testing, the default thresholds have to be heavily increased to avoid flaky tests of small sample sizes.
+    """
+    knn_graph = draw(knn_graph_strategy(num_samples=num_samples_strategy, k_neighbors=k_neighbors_strategy))
+    
+    lab = Datalab(data={})
+    _kwargs = {}
+    if threshold is not None:
+        _kwargs["threshold"] = threshold
+    issue_manager = NearDuplicateIssueManager(datalab=lab, **_kwargs)
+    issue_manager.find_issues(knn_graph=knn_graph)
+    issues = issue_manager.issues["is_near_duplicate_issue"]
+    
+    if with_issues:
+        assume(any(issues))
+    else:
+        assume(not any(issues))
+    return issue_manager
+
+@composite
+def no_issue_issue_manager_strategy(draw):
+    return build_issue_manager(draw, st.integers(min_value=10, max_value=50), st.integers(min_value=2, max_value=5), with_issues=False)
+
+@composite
+def issue_manager_with_issues_strategy(draw):
+    return build_issue_manager(draw, st.integers(min_value=10, max_value=20), st.integers(min_value=2, max_value=5), with_issues=True, threshold=0.9)
+
+
 class TestNearDuplicateIssueManager:
     @pytest.fixture
     def embeddings(self, lab):
