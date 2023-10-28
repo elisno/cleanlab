@@ -29,6 +29,41 @@ def embeddings_strategy(draw):
     )
     return embeddings
 
+@composite
+def knn_graph_strategy(draw, num_samples, k_neighbors):
+    """This is a strategy used for creating a property based test for a `knn_graph: csr_matrix` object."""
+    # Helper function to retrieve value from a strategy if given
+    def get_value_or_draw(val):
+        return draw(val) if isinstance(val, st.SearchStrategy) else val
+
+    num_samples = get_value_or_draw(num_samples)
+    k_neighbors = get_value_or_draw(k_neighbors)
+
+    # Generate a symmetric distance matrix
+    upper_triangle = [
+        draw(st.lists(st.floats(min_value=0, max_value=100, allow_nan=False, allow_infinity=False),
+                     min_size=i, max_size=i))
+        for i in range(1, num_samples + 1)
+    ]
+
+    distance_matrix = np.zeros((num_samples, num_samples))
+    for i, row in enumerate(upper_triangle):
+        distance_matrix[i, :i + 1] = row
+        distance_matrix[:i + 1, i] = row
+
+    np.fill_diagonal(distance_matrix, np.inf)  # Prevent selecting a point as its own neighbor
+
+    # Compute k-nearest neighbors based on the distance matrix
+    sorted_indices = np.argsort(distance_matrix, axis=1)
+    kneighbor_indices = sorted_indices[:, :k_neighbors]
+    kneighbor_distances = np.array([distance_matrix[i, kneighbor_indices[i]] for i in range(num_samples)])
+
+    # Convert to CSR-representation
+    data = kneighbor_distances.ravel()
+    inds = kneighbor_indices.ravel()
+    indptr = np.arange(0, num_samples * k_neighbors + 1, k_neighbors)
+
+    return csr_matrix((data, inds, indptr), shape=(num_samples, num_samples))
 
 class TestNearDuplicateIssueManager:
     @pytest.fixture
@@ -139,3 +174,53 @@ class TestNearDuplicateIssueManager:
             for i, near_duplicate_set in enumerate(near_duplicate_sets)
             if issues[i]
         ), "Issue examples should have near duplicate sets"
+
+class TestKNNGraphRepresentation:
+    """Validates the properties of the knn_graph objects as they are computed by scikit-learn's NearestNeighbors.kneighbors_graph method.
+    
+    This is a helper test class to make sure we're testing knn-graph-based issue checkers with valid knn-graphs.
+    """
+    # Test the strategy to check if it works as expected
+    @given(knn_graph=knn_graph_strategy(num_samples=st.integers(min_value=10, max_value=50), k_neighbors=st.integers(min_value=2, max_value=5)))
+    def test_knn_graph(self, knn_graph):
+        N = knn_graph.shape[0]
+        distances = knn_graph.data.reshape(N, -1)
+        indices = knn_graph.indices.reshape(N, -1)
+    
+        # Validation checks
+        self._check_distances_sorted(distances)
+        self._check_indices_validity(indices)
+        self._verify_mutual_neighbors_have_same_distances(distances, indices, N)
+        self._verify_mutual_consistency_of_distances(distances, indices, N)
+
+    def _check_distances_sorted(self, distances) -> None:
+        # Check distances are sorted in ascending order for each row
+        for row in distances:
+            assert all(row[i] <= row[i+1] for i in range(len(row)-1))
+
+    def _check_indices_validity(self, indices) -> None:
+        # Check that indices are unique across columns and don't have the row's index
+        for row_idx, row in enumerate(indices):
+            assert len(set(row)) == len(row)
+            assert row_idx not in row
+
+    def _verify_mutual_neighbors_have_same_distances(self, distances, indices, N) -> None:
+        # Verify that mutual neighbors have the same distances
+        for i in range(N):
+            for j in indices[i]:
+                if i in indices[j]:
+                    d_ij = distances[i][list(indices[i]).index(j)]
+                    d_ji = distances[j][list(indices[j]).index(i)]
+                    assert math.isclose(d_ij, d_ji), f"Distances between {i} and {j} do not match: {d_ij} vs {d_ji}"
+    
+    def _verify_mutual_consistency_of_distances(self, distances, indices, N) -> None:
+        # Verify the mutual consistency of k-NN distances:
+        # For every point i and its neighbor j, ensure that the distance from i to j 
+        # cannot be smaller than the distance from any other neighbor k of j to j. 
+        for i in range(N):
+            for j in indices[i]:
+                d_ij = distances[i][list(indices[i]).index(j)]
+                j_neighbors_distances = distances[j]
+                if d_ij < max(j_neighbors_distances):
+                    assert i in indices[j], f"Point {i} should be a neighbor of point {j}, it's closer than the farthest neighbor of {j}"
+
