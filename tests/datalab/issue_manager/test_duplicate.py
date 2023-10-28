@@ -258,3 +258,36 @@ class TestKNNGraphRepresentation:
                 if d_ij < max(j_neighbors_distances):
                     assert i in indices[j], f"Point {i} should be a neighbor of point {j}, it's closer than the farthest neighbor of {j}"
 
+
+class TestNearDuplicateSets:
+    
+    @given(issue_manager=no_issue_issue_manager_strategy())
+    @settings(deadline=800)
+    def test_near_duplicate_sets_empty_if_no_issue(self, issue_manager):
+        near_duplicate_sets = issue_manager.info["near_duplicate_sets"]
+        assert all(len(near_duplicate_set) == 0 for near_duplicate_set in near_duplicate_sets)
+        
+    @given(issue_manager=issue_manager_with_issues_strategy())
+    @settings(deadline=800, max_examples=1000)
+    def test_symmetric_and_flagged_consistency(self, issue_manager):
+        near_duplicate_sets = issue_manager.info["near_duplicate_sets"]
+        issues = issue_manager.issues["is_near_duplicate_issue"]
+        
+        # Test symmetry: If A is in near_duplicate_set of B, then B should be in near_duplicate_set of A.
+        for i, near_duplicates in enumerate(near_duplicate_sets):
+            for j in near_duplicates:
+                assert i in near_duplicate_sets[j], f"Example {j} is in near_duplicate_set of {i}, but not vice versa"
+
+                
+        # If an example is flagged as near_duplicate, then every example in its near_duplicate_set should also be flagged as near_duplicate.
+        for i, near_duplicate_set in enumerate(near_duplicate_sets):
+            if issues[i]:
+                # Near duplicate sets of flagged examples should not be empty
+                assert len(near_duplicate_set) > 0, "Near duplicate set of flagged example should not be empty"
+                
+                # Examples in near_duplicate_set should also be flagged as near_duplicate
+                set_flags = issues[np.array(list(near_duplicate_set))]
+                assert all(set_flags), f"Example {i} is flagged as near_duplicate but some examples in its near_duplicate_set are not"
+            else:
+                # Near duplicate sets of non-flagged examples should be empty
+                assert len(near_duplicate_set) == 0, "Near duplicate set of non-flagged example should be empty"
