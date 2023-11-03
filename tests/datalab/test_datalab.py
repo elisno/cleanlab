@@ -834,6 +834,21 @@ class TestDatalabFindNonIIDIssues:
         assert non_iid_summary["score"].values[0] == 0
         assert non_iid_summary["num_issues"].values[0] == 1
 
+    def test_find_issue_with_knn_graph(self, sorted_embeddings):
+        """Test that the `knn_graph` argument to `find_issues` is used instead of computing a new
+        one from the `features` argument."""
+        data = {"labels": [0, 1, 0]}
+        lab = Datalab(data=data, label_name="labels")
+        lab.find_issues(features=sorted_embeddings, issue_types={"non_iid": {}})
+        summary = lab.get_issue_summary()
+        knn_graph = lab.get_info("statistics")["weighted_knn_graph"]
+
+        # Run knn_graph through a fresh Datalab instance
+        lab2 = Datalab(data=data)  # Ignore labels
+        lab2.find_issues(knn_graph=knn_graph, issue_types={"non_iid": {}})
+        summary2 = lab2.get_issue_summary()
+        pd.testing.assert_frame_equal(summary, summary2)
+
 
 class TestDatalabFindLabelIssues:
     @pytest.fixture
