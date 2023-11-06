@@ -834,7 +834,7 @@ class TestDatalabFindNonIIDIssues:
         assert non_iid_summary["score"].values[0] == 0
         assert non_iid_summary["num_issues"].values[0] == 1
 
-    def test_find_issue_with_knn_graph(self, sorted_embeddings):
+    def test_find_issues_with_knn_graph(self, sorted_embeddings):
         """Test that the `knn_graph` argument to `find_issues` is used instead of computing a new
         one from the `features` argument."""
         data = {"labels": [0, 1, 0]}
