@@ -12,6 +12,7 @@ jobs:
       matrix:
         python:
           - "3.11"
+          - "3.12"
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
@@ -44,6 +45,7 @@ jobs:
           - macos-latest
         python:
           - "3.11"
+          - "3.12"
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
