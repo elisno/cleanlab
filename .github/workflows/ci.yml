@@ -27,7 +27,10 @@ jobs:
       - name: Install cleanlab
         run: pip install -e ".[all]"
       - name: Install development dependencies
-        run: pip install -r requirements-dev.txt    
+        run: pip install -r requirements-dev.txt
+      - name: Install fasttext for non-Windows machines
+        run: |
+          pip install fasttext
       - name: Test with coverage
         run: pytest tests/test_frameworks.py --verbose --cov=cleanlab/ --cov-config .coveragerc --cov-report=xml
         env:
