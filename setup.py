@@ -82,7 +82,7 @@ setup(
         "Topic :: Software Development :: Libraries",
         "Topic :: Software Development :: Libraries :: Python Modules",
     ],
-    python_requires=">=3.8",
+    python_requires=">=3.7",
     # What does your project relate to?
     keywords="machine_learning data_cleaning confident_learning classification weak_supervision "
     "learning_with_noisy_labels unsupervised_learning datacentric_ai, datacentric",
