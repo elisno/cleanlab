@@ -8,10 +8,22 @@ jobs:
   store_published_version:
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.step1.outputs.version }}
+      version: ${{ steps.compare.outputs.version }}
     steps:
-      - id: step1
-        name: Store the published version
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.11
+
+      - name: Install package
+        run: pip install .
+
+      - name: Compare the published version with the package version
+        id: compare
         run: |
           TAG_NAME="${{ github.ref_name }}"
           # TAG_NAME must be in the form "v1.2.3[...]", error if it doesn't match
@@ -19,9 +31,15 @@ jobs:
                 echo "Tag name '$TAG_NAME' does not match the expected pattern 'vX.Y.Z'"
                 exit 1
             fi
-          # Strip the 'v' prefix from the tag
+          # Strip the 'v' prefix from the tag, and store the version in an output variable
           VERSION=${TAG_NAME:1} # Strip the 'v' prefix from the tag
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          # Check that the package version matches the tag version
+          PACKAGE_VERSION=$(python -c "import cleanlab; print(cleanlab.__version__)")
+          if [ "$PACKAGE_VERSION" != "$VERSION" ]; then
+            echo "Package version $PACKAGE_VERSION does not match tag $VERSION"
+            exit 1
+          fi
 
   build:
     needs: store_published_version
