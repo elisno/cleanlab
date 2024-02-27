@@ -7,8 +7,11 @@ on:
 jobs:
   store_published_version:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.step1.outputs.version }}
     steps:
-      - name: Store the published version
+      - id: step1
+        name: Store the published version
         run: |
           TAG_NAME="${{ github.ref_name }}"
           # TAG_NAME must be in the form "v1.2.3[...]", error if it doesn't match
