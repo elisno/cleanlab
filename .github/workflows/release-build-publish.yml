@@ -41,28 +41,18 @@ jobs:
   publish-testpypi:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+        id-token: write  # IMPORTANT: this permission is mandatory for trusted publishing
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: 3.11
-
-      - name: Install dependencies
-        run: pip install --upgrade setuptools wheel twine
-
       - name: Fetch build artifacts
         uses: actions/download-artifact@v4
         with:
           name: package
           path: dist/
 
-      - name: Verify artifacts
-        run: twine check dist/*
-
       - name: Publish to TestPyPI
-        run: twine upload --repository-url https://test.pypi.org/legacy/ dist/*
-
+        uses: pypa/gh-action-pypi-publish@e53eb8b103ffcb59469888563dc324e3c8ba6f06
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          verify-metadata: true
