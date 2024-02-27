@@ -11,9 +11,9 @@ jobs:
       - name: Store the published version
         run: |
           TAG_NAME="${{ github.ref_name }}"
-          # TAG_NAME must be in the form "refs/tags/v1.2.3[...]", error if it doesn't match
-            if [[ ! $TAG_NAME =~ ^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
-                echo "Tag name '$TAG_NAME' does not match the expected pattern 'refs/tags/v1.2.3'"
+          # TAG_NAME must be in the form "v1.2.3[...]", error if it doesn't match
+            if [[ ! $TAG_NAME =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+                echo "Tag name '$TAG_NAME' does not match the expected pattern 'v1.2.3'"
                 exit 1
             fi
           # Strip the 'v' prefix from the tag
