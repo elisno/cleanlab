@@ -70,7 +70,7 @@ jobs:
       - name: Publish to TestPyPI
         uses: pypa/gh-action-pypi-publish@e53eb8b103ffcb59469888563dc324e3c8ba6f06
         with:
-          repository-url: https://test.pypi.org/simple/
+          repository-url: https://test.pypi.org/legacy/
           verify-metadata: true
 
   run-pytest-on-testpypi-package:
