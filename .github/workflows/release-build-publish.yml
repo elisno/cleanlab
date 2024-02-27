@@ -58,7 +58,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: package
-          path: dist/*
+          path: dist/
 
       - name: Verify artifacts
         run: twine check dist/*
