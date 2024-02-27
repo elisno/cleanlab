@@ -5,7 +5,18 @@ on:
       types: [ published ]
 
 jobs:
+  store_published_version:
+    # Run the job if the release islatest is true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Store the published version
+        run: |
+          TAG_NAME="${{ github.ref_name }}"
+          VERSION=${TAG_NAME:1} # Strip the 'v' prefix from the tag
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
   build:
+    needs: store_published_version
     runs-on: ubuntu-latest
 
     steps:
