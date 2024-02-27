@@ -13,7 +13,7 @@ jobs:
           TAG_NAME="${{ github.ref_name }}"
           # TAG_NAME must be in the form "v1.2.3[...]", error if it doesn't match
             if [[ ! $TAG_NAME =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
-                echo "Tag name '$TAG_NAME' does not match the expected pattern 'v1.2.3'"
+                echo "Tag name '$TAG_NAME' does not match the expected pattern 'vX.Y.Z'"
                 exit 1
             fi
           # Strip the 'v' prefix from the tag
@@ -73,14 +73,33 @@ jobs:
           repository-url: https://test.pypi.org/legacy/
           verify-metadata: true
 
-  run-pytest-on-testpypi-package:
-    needs: publish-testpypi
+  verify-version:
+    needs: [publish-testpypi, store_published_version]
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.11
 
+      - name: Install package from TestPyPI
+        run: pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ example-package-elisno
+
+      - name: Verify the published version
+        run: |
+          VERSION="${{ needs.store_published_version.outputs.version }}" # Use the output directly
+          TEST_IMPORT_VERSION=$(python -c "import cleanlab; print(cleanlab.__version__)")
+          if [ "$TEST_IMPORT_VERSION" != "$VERSION" ]; then
+            echo "Imported version $TEST_IMPORT_VERSION does not match tag $VERSION"
+            exit 1
+          fi
+
+  test-basic-import:
+    needs: verify-version
+    runs-on: ubuntu-latest
+
+    steps:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -96,6 +115,17 @@ jobs:
           ood = OutOfDistribution()
           print(ood)"
 
+  test-extras-import:
+    needs: verify-version
+    runs-on: ubuntu-latest
+    
+    steps:
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.11
+
       - name: Install package with extras
         run: pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ example-package-elisno[all]
 
@@ -103,5 +133,5 @@ jobs:
         run: |
           python -c "import cleanlab
           from cleanlab import Datalab
-          lab = Datalab({'a': [1,2,3,4,5], 'b': ["a", "b", "c", "b", "a"]})
+          lab = Datalab({'a': [1, 2, 3, 4, 5], 'b': ['a', 'b', 'c', 'b', 'a']})
           print(lab)"
