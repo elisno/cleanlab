@@ -157,3 +157,22 @@ jobs:
           from cleanlab import Datalab
           lab = Datalab({'a': [1, 2, 3, 4, 5], 'b': ['a', 'b', 'c', 'b', 'a']})
           print(lab)"
+
+  publish-pypi:
+    needs: [test-basic-import, test-extras-import]
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+        id-token: write  # IMPORTANT: this permission is mandatory for trusted publishing
+
+    steps:
+      - name: Fetch build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: package
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@e53eb8b103ffcb59469888563dc324e3c8ba6f06
+        with:
+          verify-metadata: true
