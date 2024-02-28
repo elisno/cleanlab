@@ -5,6 +5,26 @@ on:
       types: [ published ]
 
 jobs:
+  extract_project_name:
+    runs-on: ubuntu-latest
+    outputs:
+      project_name: ${{ steps.extract_name.outputs.project_name }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Extract project name from pyproject.toml
+        id: extract_name
+        run: |
+          # Use Python to parse pyproject.toml and extract the project name
+          PROJECT_NAME=$(python -c 'import tomllib; print(tomllib.loads(open("pyproject.toml", "rb").read())["project"]["name"])')
+          echo "project_name=$PROJECT_NAME" >> $GITHUB_OUTPUT
+
   store_published_version:
     runs-on: ubuntu-latest
     outputs:
@@ -95,7 +115,7 @@ jobs:
           verify-metadata: true
 
   verify-version:
-    needs: [publish-testpypi, store_published_version]
+    needs: [publish-testpypi, store_published_version, extract_project_name]
     runs-on: ubuntu-latest
 
     steps:
@@ -105,7 +125,9 @@ jobs:
           python-version: 3.11
 
       - name: Install package from TestPyPI
-        run: pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ example-package-elisno
+        env:
+          PROJECT_NAME: ${{ needs.extract_project_name.outputs.project_name }}
+        run: pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ $PROJECT_NAME
 
       - name: Verify the published version
         env:
@@ -118,7 +140,7 @@ jobs:
           fi
 
   test-basic-import:
-    needs: verify-version
+    needs: [verify-version, extract_project_name]
     runs-on: ubuntu-latest
 
     steps:
@@ -128,7 +150,9 @@ jobs:
           python-version: 3.11
 
       - name: Install package from TestPyPI
-        run: pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ example-package-elisno
+        env:
+          PROJECT_NAME: ${{ needs.extract_project_name.outputs.project_name }}
+        run: pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ $PROJECT_NAME
 
       - name: Test importing package
         run: |
@@ -138,7 +162,7 @@ jobs:
           print(ood)"
 
   test-extras-import:
-    needs: verify-version
+    needs: [verify-version, extract_project_name]
     runs-on: ubuntu-latest
     
     steps:
@@ -149,7 +173,9 @@ jobs:
           python-version: 3.11
 
       - name: Install package with extras
-        run: pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ example-package-elisno[all]
+        env:
+          PROJECT_NAME: ${{ needs.extract_project_name.outputs.project_name }}
+        run: pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ $PROJECT_NAME[all]
 
       - name: Test importing package with extras
         run: |
