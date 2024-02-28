@@ -44,7 +44,6 @@ EXTRAS_REQUIRE = {
 EXTRAS_REQUIRE["all"] = list(set(sum(EXTRAS_REQUIRE.values(), [])))
 
 setup(
-    name="example_package_elisno",
     version=__version__,
     license="AGPLv3+",
     long_description=long_description,
