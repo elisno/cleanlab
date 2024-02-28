@@ -25,9 +25,6 @@ here = path.abspath(path.dirname(__file__))
 with open(path.join(here, "README.md"), encoding="utf-8") as f:
     long_description = f.read()
 
-# Get version number and store it in __version__
-exec(open("cleanlab/version.py").read())
-
 DATALAB_REQUIRE = [
     # Mainly for Datalab's data storage class.
     # Still some type hints that require datasets
@@ -44,7 +41,6 @@ EXTRAS_REQUIRE = {
 EXTRAS_REQUIRE["all"] = list(set(sum(EXTRAS_REQUIRE.values(), [])))
 
 setup(
-    version=__version__,
     license="AGPLv3+",
     long_description=long_description,
     long_description_content_type="text/markdown",
