@@ -75,9 +75,6 @@ include-package-data = true
 [tool.setuptools.packages]
 find = {}
 
-[tool.setuptools.package-data]
-"*" = ["LICENSE"]
-
 [tool.black]
 line-length = 100
 exclude = '''
