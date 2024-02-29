@@ -8,7 +8,7 @@ jobs:
   extract_project_name:
     runs-on: ubuntu-latest
     outputs:
-      project_name: ${{ steps.extract_name.outputs.value }}
+      cleanlab_package_name: ${{ steps.extract_name.outputs.value }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -112,6 +112,9 @@ jobs:
   verify-version:
     needs: [publish-testpypi, store_published_version, extract_project_name]
     runs-on: ubuntu-latest
+    env:
+      # CLEANLAB_PACKAGE_NAME is read from the cleanlab.version.py file, used when the package is published in a non-cleanlab PyPI project
+      CLEANLAB_PACKAGE_NAME: ${{ needs.extract_project_name.outputs.cleanlab_package_name }}
 
     steps:
       - name: Set up Python
@@ -120,9 +123,7 @@ jobs:
           python-version: 3.11
 
       - name: Install package from TestPyPI
-        env:
-          PROJECT_NAME: ${{ needs.extract_project_name.outputs.project_name }}
-        run: pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ $PROJECT_NAME
+        run: pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ $CLEANLAB_PACKAGE_NAME
 
       - name: Verify the published version
         env:
@@ -137,6 +138,9 @@ jobs:
   test-basic-import:
     needs: [verify-version, extract_project_name]
     runs-on: ubuntu-latest
+    env:
+      # CLEANLAB_PACKAGE_NAME is read from the cleanlab.version.py file, used when the package is published in a non-cleanlab PyPI project
+      CLEANLAB_PACKAGE_NAME: ${{ needs.extract_project_name.outputs.cleanlab_package_name }}
 
     steps:
       - name: Set up Python
@@ -145,9 +149,7 @@ jobs:
           python-version: 3.11
 
       - name: Install package from TestPyPI
-        env:
-          PROJECT_NAME: ${{ needs.extract_project_name.outputs.project_name }}
-        run: pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ $PROJECT_NAME
+        run: pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ $CLEANLAB_PACKAGE_NAME
 
       - name: Test importing package
         run: |
@@ -159,18 +161,18 @@ jobs:
   test-extras-import:
     needs: [verify-version, extract_project_name]
     runs-on: ubuntu-latest
+    env:
+      # CLEANLAB_PACKAGE_NAME is read from the cleanlab.version.py file, used when the package is published in a non-cleanlab PyPI project
+      CLEANLAB_PACKAGE_NAME: ${{ needs.extract_project_name.outputs.cleanlab_package_name }}
     
     steps:
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: 3.11
 
       - name: Install package with extras
-        env:
-          PROJECT_NAME: ${{ needs.extract_project_name.outputs.project_name }}
-        run: pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ $PROJECT_NAME[all]
+        run: pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ $CLEANLAB_PACKAGE_NAME[all]
 
       - name: Test importing package with extras
         run: |
