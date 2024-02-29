@@ -13,17 +13,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: TOML Reader
+        uses: SebRollen/toml-action@v1.2.0
+        id: extract_name_toml
         with:
-          python-version: '3.11'
-
-      - name: Extract project name from pyproject.toml
-        id: extract_name
-        run: |
-          # Use Python to parse pyproject.toml and extract the project name
-          PROJECT_NAME=$(python -c 'import tomllib; print(tomllib.loads(open("pyproject.toml", "rb").read())["project"]["name"])')
-          echo "project_name=$PROJECT_NAME" >> $GITHUB_OUTPUT
+          file: "pyproject.toml"
+          field: "project.name"
 
   store_published_version:
     runs-on: ubuntu-latest
