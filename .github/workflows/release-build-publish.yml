@@ -8,14 +8,14 @@ jobs:
   extract_project_name:
     runs-on: ubuntu-latest
     outputs:
-      project_name: ${{ steps.extract_name.outputs.project_name }}
+      project_name: ${{ steps.extract_name.outputs.value }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: TOML Reader
         uses: SebRollen/toml-action@v1.2.0
-        id: extract_name_toml
+        id: extract_name
         with:
           file: "pyproject.toml"
           field: "project.name"
