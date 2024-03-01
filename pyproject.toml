@@ -71,7 +71,10 @@ Documentation = "https://docs.cleanlab.ai"
 
 [tool.setuptools]
 include-package-data = true
-packages = ["cleanlab"]
+
+[tool.setuptools.packages.find]
+include = ["cleanlab*"]
+exclude = ["tests*"]
 
 [tool.black]
 line-length = 100
