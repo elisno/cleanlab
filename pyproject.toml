@@ -74,6 +74,7 @@ include-package-data = true
 
 [tool.setuptools.packages.find]
 include = ["cleanlab*", "cleanlab.*"]
+exclude = ["tests*", "tests.*", "*.tests", "*.tests.*", "*.tests*"]
 
 [tool.black]
 line-length = 100
