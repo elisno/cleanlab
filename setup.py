@@ -19,11 +19,8 @@ class egg_info_ex(egg_info):
         egg_info.run(self)
 
 
-here = path.abspath(path.dirname(__file__))
-
-# Get the long description from the README file
-with open(path.join(here, "README.md"), encoding="utf-8") as f:
-    long_description = f.read()
+# Get version number and store it in __version__
+exec(open("cleanlab/version.py").read())
 
 DATALAB_REQUIRE = [
     # Mainly for Datalab's data storage class.
@@ -41,6 +38,7 @@ EXTRAS_REQUIRE = {
 EXTRAS_REQUIRE["all"] = list(set(sum(EXTRAS_REQUIRE.values(), [])))
 
 setup(
+    version=__version__,
     cmdclass={"egg_info": egg_info_ex},
     extras_require=EXTRAS_REQUIRE,
 )
