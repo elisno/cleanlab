@@ -14,24 +14,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with cleanlab.  If not, see <https://www.gnu.org/licenses/>.
 
-import os
-import importlib.metadata
-import tomllib
 
-# Get the version from pyproject.toml
-try:
-    # Attempt to load version from package that is installed in editable mode
-    with open("pyproject.toml", "rb") as f:
-        pyproject_data = tomllib.load(f)
-    __version__ = pyproject_data["project"]["version"]
-except Exception as e:
-    # The official package name is "cleanlab", but it may be different when developing on a different PyPI repository.
-    # I.e. `pip install cleanlab`, which installs the official `cleanlab` package from PyPI.
-    # See DEVELOPMENT.md for more information
-    package_name = os.environ.get("CLEANLAB_PACKAGE_NAME", "cleanlab")
-
-    # Load version from built, distributed and pip installed package
-    __version__ = importlib.metadata.version(package_name)
+__version__ = "2.6.11"
 
 # 2.6.1 - Not yet released, you are using bleeding-edge developer version. See its documentation at: https://docs.cleanlab.ai/master/
 

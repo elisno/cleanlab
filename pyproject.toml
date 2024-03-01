@@ -4,7 +4,6 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "example_package_elisno"
-version = "2.6.11"
 # List run-time dependencies here.  These will be installed by pip when
 # your project is installed. For an analysis of "install_requires" vs pip's
 # requirements files see:
@@ -60,6 +59,7 @@ keywords = [
 ]
 license = {file = "LICENSE"}
 dynamic = [
+  "version",
   "optional-dependencies",
 ]
 
