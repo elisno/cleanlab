@@ -112,6 +112,7 @@ jobs:
   verify-version:
     needs: [publish-testpypi, store_published_version, extract_project_name]
     runs-on: ubuntu-latest
+    environment: testpypi
 
     steps:
       - name: Set up Python
@@ -159,7 +160,7 @@ jobs:
   test-extras-import:
     needs: [verify-version, extract_project_name]
     runs-on: ubuntu-latest
-    
+ 
     steps:
       - name: Set up Python
         uses: actions/setup-python@v5
