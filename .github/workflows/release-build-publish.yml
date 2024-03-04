@@ -84,6 +84,50 @@ jobs:
         run: |
           twine check dist/*
 
+      - name: Verify contents of the tar.gz
+        run: |
+          # Extract the tar.gz to a temporary directory
+          TMPDIR=$(mktemp -d)
+          tar -xzf dist/*.tar.gz -C $TMPDIR
+          PACKAGE_DIR=$TMPDIR/$(ls $TMPDIR) # Assuming there's only one directory extracted
+
+          # Define expected files and directories
+          EXPECTED_FILES="LICENSE PKG-INFO MANIFEST.in DEVELOPMENT.md CONTRIBUTING.md CODE_OF_CONDUCT.md README.md pyproject.toml setup.cfg setup.py"
+          EXPECTED_DIRS="cleanlab cleanlab.egg-info"
+
+          # Collect actual top-level files and directories
+          ACTUAL_CONTENTS=$(ls $PACKAGE_DIR)
+          ACTUAL_FILES=$(find $PACKAGE_DIR -maxdepth 1 -type f -exec basename {} \;)
+          ACTUAL_DIRS=$(find $PACKAGE_DIR -maxdepth 1 -type d -exec basename {} \; | sed "1d") # Remove the package directory itself from the list
+
+          # Function to check for unexpected or missing files and directories
+          check_contents() {
+            local missing=0
+            # Check for expected files
+            for expected_file in $EXPECTED_FILES; do
+              echo $ACTUAL_FILES | grep -qw $expected_file || { echo "Missing expected file: $expected_file"; missing=1; }
+            done
+            
+            # Check for expected directories
+            for expected_dir in $EXPECTED_DIRS; do
+              echo $ACTUAL_DIRS | grep -qw $expected_dir || { echo "Missing expected directory: $expected_dir"; missing=1; }
+            done
+
+            # Check for unexpected files and directories
+            for actual in $ACTUAL_CONTENTS; do
+              echo $EXPECTED_FILES $EXPECTED_DIRS | grep -qw $actual || { echo "Unexpected item in package: $actual"; missing=1; }
+            done
+
+            # Exit if anything unexpected or missing
+            if [ $missing -ne 0 ]; then
+              echo "Package content verification failed."
+              exit 1
+            fi
+          }
+
+          # Execute checks
+          check_contents
+
       - name: Store build artifacts
         uses: actions/upload-artifact@v4
         with:
