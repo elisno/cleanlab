@@ -57,7 +57,7 @@ jobs:
           fi
 
   build:
-    needs: store_published_version
+    needs: [store_published_version, extract_project_name]
     runs-on: ubuntu-latest
 
     steps:
@@ -85,6 +85,8 @@ jobs:
           twine check dist/*
 
       - name: Verify contents of the tar.gz
+        env:
+          CLEANLAB_PACKAGE_NAME: ${{ needs.extract_project_name.outputs.cleanlab_package_name }}
         run: |
           # Extract the tar.gz to a temporary directory
           TMPDIR=$(mktemp -d)
@@ -93,7 +95,7 @@ jobs:
 
           # Define expected files and directories
           EXPECTED_FILES="LICENSE PKG-INFO MANIFEST.in DEVELOPMENT.md CONTRIBUTING.md CODE_OF_CONDUCT.md README.md pyproject.toml setup.cfg setup.py"
-          EXPECTED_DIRS="cleanlab cleanlab.egg-info"
+          EXPECTED_DIRS="cleanlab $CLEANLAB_PACKAGE_NAME.egg-info"
 
           # Collect actual top-level files and directories
           ACTUAL_CONTENTS=$(ls $PACKAGE_DIR)
