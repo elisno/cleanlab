@@ -17,7 +17,7 @@
 """
 Wrapper class you can use to make any Keras model compatible with :py:class:`CleanLearning <cleanlab.classification.CleanLearning>` and sklearn.
 Use :py:class:`KerasWrapperModel<cleanlab.experimental.keras.KerasWrapperModel>` to wrap existing functional API code for ``keras.Model`` objects,
-and :py:class:`KerasWrapperSequential<cleanlab.experimental.keras.KerasWrapperSequential>` to wrap existing ``tf.keras.models.Sequential`` objects.
+and :py:class:`KerasWrapperSequential<cleanlab.experimental.keras.KerasWrapperSequential>` to wrap existing ``keras.models.Sequential`` objects.
 Most of the instance methods of this class work the same as the ones for the wrapped Keras model,
 see the `Keras documentation <https://keras.io/>`_ for details.
 
@@ -37,10 +37,14 @@ Tips:
 
 """
 
+import os
 import tensorflow as tf
-import keras  # type: ignore
+import tf_keras as keras  # type: ignore
 import numpy as np
 from typing import Callable, Optional
+
+# Required for Tensorflow 2.16 (https://github.com/tensorflow/tensorflow/releases/tag/v2.16.1)
+os.environ["TF_USE_LEGACY_KERAS"] = "1"
 
 
 class KerasWrapperModel:
@@ -58,14 +62,14 @@ class KerasWrapperModel:
         For example::
 
             def model(num_features, num_classes):
-                inputs = tf.keras.Input(shape=(num_features,))
-                outputs = tf.keras.layers.Dense(num_classes)(inputs)
-                return tf.keras.Model(inputs=inputs, outputs=outputs, name="my_keras_model")
+                inputs = keras.Input(shape=(num_features,))
+                outputs = keras.layers.Dense(num_classes)(inputs)
+                return keras.Model(inputs=inputs, outputs=outputs, name="my_keras_model")
 
     model_kwargs: dict, default = {}
         Dict of optional keyword arguments to pass into ``model()`` when instantiating the ``keras.Model``.
 
-    compile_kwargs: dict, default = {"loss": tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)}
+    compile_kwargs: dict, default = {"loss": keras.losses.SparseCategoricalCrossentropy(from_logits=True)}
         Dict of optional keyword arguments to pass into ``model.compile()`` for declaring loss, metrics, optimizer, etc.
     """
 
@@ -74,7 +78,7 @@ class KerasWrapperModel:
         model: Callable,
         model_kwargs: dict = {},
         compile_kwargs: dict = {
-            "loss": tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
+            "loss": keras.losses.SparseCategoricalCrossentropy(from_logits=True)
         },
         params: Optional[dict] = None,
     ):
@@ -162,21 +166,21 @@ class KerasWrapperModel:
 
 
 class KerasWrapperSequential:
-    """Makes any ``tf.keras.models.Sequential`` object compatible with :py:class:`CleanLearning <cleanlab.classification.CleanLearning>` and sklearn.
+    """Makes any ``keras.models.Sequential`` object compatible with :py:class:`CleanLearning <cleanlab.classification.CleanLearning>` and sklearn.
 
     `KerasWrapperSequential` is instantiated in the same way as a keras ``Sequential``  object, except for optional extra `compile_kwargs` argument.
-    Just instantiate this object in the same way as your ``tf.keras.models.Sequential`` object (rather than passing in an existing ``Sequential`` object).
+    Just instantiate this object in the same way as your ``keras.models.Sequential`` object (rather than passing in an existing ``Sequential`` object).
     The instance methods of this class work in the same way as those of any keras ``Sequential`` object, see the `Keras documentation <https://keras.io/>`_ for details.
 
     Parameters
     ----------
     layers: list
-        A list containing the layers to add to the keras ``Sequential`` model (same as for ``tf.keras.models.Sequential``).
+        A list containing the layers to add to the keras ``Sequential`` model (same as for ``keras.models.Sequential``).
 
     name: str, default = None
-        Name for the Keras model (same as for ``tf.keras.models.Sequential``).
+        Name for the Keras model (same as for ``keras.models.Sequential``).
 
-    compile_kwargs: dict, default = {"loss": tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)}
+    compile_kwargs: dict, default = {"loss": keras.losses.SparseCategoricalCrossentropy(from_logits=True)}
         Dict of optional keyword arguments to pass into ``model.compile()`` for declaring loss, metrics, optimizer, etc.
     """
 
@@ -185,7 +189,7 @@ class KerasWrapperSequential:
         layers: Optional[list] = None,
         name: Optional[str] = None,
         compile_kwargs: dict = {
-            "loss": tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
+            "loss": keras.losses.SparseCategoricalCrossentropy(from_logits=True)
         },
         params: Optional[dict] = None,
     ):
@@ -226,7 +230,7 @@ class KerasWrapperSequential:
             If ``X`` is a numpy array or pandas dataframe, the labels have to be passed in using this argument.
         """
         if self.net is None:
-            self.net = tf.keras.models.Sequential(self.layers, self.name)
+            self.net = keras.models.Sequential(self.layers, self.name)
             self.net.compile(**self.compile_kwargs)
 
         # TODO: check for generators
@@ -265,7 +269,7 @@ class KerasWrapperSequential:
     def summary(self, **kwargs):
         """Returns the summary of the Keras model."""
         if self.net is None:
-            self.net = tf.keras.models.Sequential(self.layers, self.name)
+            self.net = keras.models.Sequential(self.layers, self.name)
             self.net.compile(**self.compile_kwargs)
 
         return self.net.summary(**kwargs)
