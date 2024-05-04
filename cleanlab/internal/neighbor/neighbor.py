@@ -81,18 +81,30 @@ def knn_to_knn_graph(knn: NearestNeighbors) -> csr_matrix:
     return csr_matrix((distances.reshape(-1), indices.reshape(-1), indptr), shape=(N, N))
 
 
-def correct_knn_distances_and_indices(
-    features: FeatureArray, knn_graph: csr_matrix
-) -> tuple[np.ndarray, np.ndarray]:
+def correct_knn_graph(features: FeatureArray, knn_graph: csr_matrix) -> csr_matrix:
     N = features.shape[0]
     distances, indicies = knn_graph.data.reshape(N, -1), knn_graph.indices.reshape(N, -1)
+
+    corrected_distances, corrected_indices = correct_knn_distances_and_indices(
+        features, distances, indicies
+    )
+    N = features.shape[0]
+    return csr_matrix(
+        (corrected_distances.reshape(-1), corrected_indices.reshape(-1), knn_graph.indptr),
+        shape=(N, N),
+    )
+
+
+def correct_knn_distances_and_indices(
+    features: FeatureArray, distances: np.ndarray, indices: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
 
     # Number of neighbors
     k = distances.shape[1]
 
     # Prepare the output arrays
     corrected_distances = np.zeros_like(distances)
-    corrected_indices = np.zeros_like(indicies, dtype=int)
+    corrected_indices = np.zeros_like(indices, dtype=int)
 
     # Use np.unique to catch inverse indices of all unique feature sets
     _, unique_inverse = np.unique(features, return_inverse=True, axis=0)
@@ -100,7 +112,7 @@ def correct_knn_distances_and_indices(
     # Map each unique feature set to its indices across the dataset
     feature_map = {u: np.where(unique_inverse == u)[0] for u in set(unique_inverse)}
 
-    for i, (dists, inds) in enumerate(zip(distances, indicies)):
+    for i, (dists, inds) in enumerate(zip(distances, indices)):
         # Find all indices where the points are the same as point i. This set is already sorted
         same_point_indices = feature_map[unique_inverse[i]]
 
