@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import Optional, TYPE_CHECKING
+import warnings
 
 import numpy as np
 from scipy.sparse import csr_matrix
@@ -96,8 +97,75 @@ def correct_knn_graph(features: FeatureArray, knn_graph: csr_matrix) -> csr_matr
 
 
 def correct_knn_distances_and_indices(
-    features: FeatureArray, distances: np.ndarray, indices: np.ndarray
+    features: FeatureArray, distances: np.ndarray, indices: np.ndarray, enable_warning: bool = False
 ) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Corrects the distances and indices of a k-nearest neighbors (knn) graph
+    based on all exact duplicates detected in the feature array.
+
+    Parameters
+    ----------
+    features :
+        The feature array used to construct the knn graph.
+    distances :
+        The distances between each point and its k nearest neighbors.
+    indices :
+        The indices of the k nearest neighbors for each point.
+    enable_warning :
+        Whether to enable warning messages if any row underestimates the number of exact duplicates.
+
+    Returns
+    -------
+    corrected_distances :
+        The corrected distances between each point and its k nearest neighbors. Exact duplicates (based on the feature array) are ensured to have zero mutual distance.
+    corrected_indices :
+        The corrected indices of the k nearest neighbors for each point. Exact duplicates are ensured to be included in the k nearest neighbors, unless the number of exact duplicates exceeds k.
+
+    Raises
+    ------
+    UserWarning :
+        A warning may be raised if there were some slots available for an exact duplicate that were missed.
+        This may happen if the number of exact duplicates in the existing knn graph is lower than k,
+        but the set of exact duplicates is larger than what was included in the knn graph.
+        This warning may be disabled by setting enable_warning=False.
+
+
+    Example
+    -------
+    >>> import numpy as np
+    >>> X = np.array(
+    ...     [
+    ...         [0, 0],
+    ...         [0, 0], # Exact duplicate of the previous point
+    ...         [1, 1], # The distances between this point and the others is sqrt(2) (equally distant from both)
+    ...     ]
+    ... )
+    >>> distances = np.array(  # Distance to the 1-NN of each point
+    ...     [
+    ...         [np.sqrt(2)],  # Should be [0]
+    ...         [1e-16],       # Should be [0]
+    ...         [np.sqrt(2)],
+    ...     ]
+    ... )
+    >>> indices = np.array(  # Index of the 1-NN of each point
+    ...     [
+    ...         [2],  # Should be [1]
+    ...         [0],
+    ...         [1],  # Might be [0] or [1]
+    ...     ]
+    ... )
+    >>> corrected_distances, corrected_indices = correct_knn_distances_and_indices(X, distances, indices)
+    >>> corrected_distances
+    array([[0.], [0.], [1.41421356]])
+    >>> corrected_indices
+    array([[1], [0], [0]])
+
+
+    Clearly, the first point misses its exact duplicate in the knn graph. To raise a warning for such cases, set enable_warning=True.
+
+    >>> corrected_distances, corrected_indices = correct_knn_distances_and_indices(X, distances, indices, enable_warning=True)
+    UserWarning: There were some slots available for an exact duplicate that were missed.
+    """
 
     # Number of neighbors
     k = distances.shape[1]
@@ -112,6 +180,8 @@ def correct_knn_distances_and_indices(
     # Map each unique feature set to its indices across the dataset
     feature_map = {u: np.where(unique_inverse == u)[0] for u in set(unique_inverse)}
 
+    points_missing_exact_duplicates = []
+
     for i, (dists, inds) in enumerate(zip(distances, indices)):
         # Find all indices where the points are the same as point i. This set is already sorted
         same_point_indices = feature_map[unique_inverse[i]]
@@ -120,6 +190,17 @@ def correct_knn_distances_and_indices(
         # The result of np.setdiff1d can be sorted with the argument assume_unique=True,
         # but that is always the case if same_point_indices is sorted.
         same_point_indices = np.setdiff1d(same_point_indices, i)
+
+        # Figure out how many were already included in the original knn graph
+        pre_existing_same_point_indices = np.intersect1d(same_point_indices, inds)
+
+        # Optionally warn the user if there are more identical points than slots available in the existing knn graph
+        same_point_indices_set_is_larger = len(pre_existing_same_point_indices) < len(
+            same_point_indices
+        )
+        slots_larger = len(pre_existing_same_point_indices) < k
+        if enable_warning and same_point_indices_set_is_larger and slots_larger:
+            points_missing_exact_duplicates.append(i)
 
         # Determine the number of same points to include, respecting the limit of k
         num_same = len(same_point_indices)
@@ -131,6 +212,7 @@ def correct_knn_distances_and_indices(
 
         # Fill the rest of the slots with different points
         num_remaining_slots = k - num_same_included
+
         if num_remaining_slots > 0:
             # Get indices and distances from knn that are not the same as i
             different_point_mask = np.isin(inds, same_point_indices, invert=True)
@@ -141,6 +223,13 @@ def correct_knn_distances_and_indices(
             corrected_indices[i, num_same_included:k] = inds[different_point_mask][
                 :num_remaining_slots
             ]
+
+    if enable_warning and points_missing_exact_duplicates:
+        # If the set of same points is larger than the number of slots available in the knn graph
+        # and the number of same points already included in the knn graph is less than k,
+        # there were some slots available for an exact duplicate that were missed. This should
+        # not happen in practice, so the user should be warned.
+        warnings.warn("There were some slots available for an exact duplicate that were missed.")
 
     return corrected_distances, corrected_indices
 
