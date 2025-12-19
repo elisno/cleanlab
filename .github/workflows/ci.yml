@@ -27,19 +27,66 @@ jobs:
           git clone https://github.com/cleanlab/assets.git
           mv assets/cleanlab_test_data ./tests/datalab/data
       - name: Install cleanlab
-        run: pip install -e ".[all]"
-      - name: Install development dependencies
-        run: pip install -r requirements-dev.txt
-      - name: Overwrite tensorflow version on Windows
-        if: runner.os == 'Windows'
         run: |
-          pip uninstall -y tensorflow
-          pip install tensorflow-cpu<2.16
+          python -m pip install --upgrade pip
+          pip install -e ".[all]"
+      - name: Install core development dependencies
+        run: pip install -r requirements-dev-core.txt
       - name: Test with coverage
         run: pytest --verbose --maxfail=3 --order-tests --cov=cleanlab/ --cov-config .coveragerc --cov-report=xml
       - uses: codecov/codecov-action@v3
         with:
           version: "v0.7.3"
+  test-torch:
+    name: "Test: PyTorch integration (Python 3.11, Ubuntu)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: Install cleanlab and dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[all]"
+          pip install -r requirements-dev-core.txt
+          pip install -r requirements-dev-torch-cpu.txt
+      - name: Verify PyTorch dependencies are available
+        run: |
+          python - <<'PY'
+          import torch
+          import torchvision
+          import skorch
+
+          print("torch version:", torch.__version__)
+          print("torchvision version:", torchvision.__version__)
+          print("skorch version:", skorch.__version__)
+          PY
+      - name: Run PyTorch integration tests
+        run: pytest --verbose --maxfail=3 --order-tests tests/test_frameworks.py -k "torch"
+  test-tensorflow:
+    name: "Test: TensorFlow integration (Python 3.11, Ubuntu)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: Install cleanlab and dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[all]"
+          pip install -r requirements-dev-core.txt
+          pip install -r requirements-dev-tensorflow-cpu.txt
+      - name: Verify TensorFlow dependencies are available
+        run: |
+          python - <<'PY'
+          import tensorflow as tf
+
+          print("tensorflow version:", tf.__version__)
+          PY
+      - name: Run TensorFlow integration tests
+        run: pytest --verbose --maxfail=3 --order-tests tests/test_frameworks.py -k "tensorflow or keras"
   test-without-extras-min-versions:
     name: Test without optional dependencies and with minimum compatible versions of dependencies
     runs-on: ubuntu-latest
@@ -75,7 +122,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install ".[all]"  # install dependencies
-          pip install -r requirements-dev.txt  # install development dependencies and type stubs
+          pip install -r requirements-dev-core.txt  # install development dependencies and type stubs
       - name: Type check
         run: mypy --install-types --non-interactive cleanlab
   fmt:
