@@ -1,20 +1,4 @@
 # Python dependencies for development
-coverage != 6.3, != 6.3.*
-datasets<4.0.0
-hypothesis
-mypy
-pandas-stubs
-pre-commit
-psutil
-pytest~=7.4
-pytest-cov
-requests
-scipy
-skorch
-tensorflow<2.16
-torch
-torchvision
-typing-extensions>=4.8.0
-wget
-matplotlib
-pillow
+-r requirements-dev-core.txt
+-r requirements-dev-torch.txt
+-r requirements-dev-tensorflow.txt

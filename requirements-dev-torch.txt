@@ -1,0 +1,4 @@
+# Additional dependencies for developing and testing PyTorch integrations
+skorch
+torch
+torchvision

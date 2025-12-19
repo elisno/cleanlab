@@ -1,0 +1,2 @@
+# Additional dependencies for developing and testing TensorFlow integrations (CPU-only)
+tensorflow<2.16

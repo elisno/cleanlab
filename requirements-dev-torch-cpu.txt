@@ -1,0 +1,5 @@
+# Additional dependencies for developing and testing PyTorch integrations
+--extra-index-url https://download.pytorch.org/whl/cpu
+skorch
+torch
+torchvision
