@@ -32,12 +32,24 @@ Run the following commands in the repository's root directory.
 pip install -r requirements-dev.txt
 ```
 
+  * `requirements-dev.txt` installs the full development stack (core tooling + PyTorch + TensorFlow). Use this to match the CI environment or when working on framework integrations.
+  * To avoid installing heavyweight ML frameworks locally, instead install `requirements-dev-core.txt` and then add one of the following as needed:
+    * `requirements-dev-torch-cpu.txt` or `requirements-dev-tensorflow-cpu.txt` (CPU-only)
+    * `requirements-dev-torch.txt` or `requirements-dev-tensorflow.txt` (default upstream wheels)
+
 2. Install cleanlab as an editable package
 ```shell
 pip install -e .
 ```
 
-For Macs with Apple silicon: replace `tensorflow` in requirements-dev.txt with: `tensorflow-macos==2.9.2` and `tensorflow-metal==0.5.1`
+  * To include all optional extras, install cleanlab in editable mode with extras enabled:
+  
+    ```shell
+    pip install -e ".[all]"
+    ```
+
+
+For Macs with Apple silicon: replace the TensorFlow line in `requirements-dev-tensorflow.txt` or `requirements-dev-tensorflow-cpu.txt` with `tensorflow-macos==2.9.2` and add `tensorflow-metal==0.5.1`.
 
 ### Handling optional dependencies
 
